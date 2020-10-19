@@ -10,6 +10,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(ENABLE_PYCSPOT "Enable cspot python bindings" OFF)
 option(ENABLE_FEATURE_REPAIR "Enable repair" OFF)
+option(ENABLE_IN_TREE_ZMQ "Enable building ZMQ related stuff in tree" ON)
 
 add_subdirectory(deps)
 add_subdirectory(src)
@@ -36,7 +37,7 @@ add_library(woof
 )
 
 find_package(Threads REQUIRED)
-find_package(czmq REQUIRED)
+#find_package(czmq REQUIRED)
 
 target_include_directories(woof PUBLIC include)
 target_link_libraries(woof PUBLIC mio euca_utils czmq-static m Threads::Threads uriparser2 fmt::fmt)

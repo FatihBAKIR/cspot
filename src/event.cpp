@@ -1,6 +1,4 @@
-extern "C" {
 #include "event.h"
-}
 
 #include <math.h>
 #include <stdio.h>

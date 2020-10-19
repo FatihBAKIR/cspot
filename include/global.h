@@ -1,11 +1,20 @@
 #ifndef CSPOT_GLOBAL_H
 #define CSPOT_GLOBAL_H
 
+
+#include "log.h"
+
+struct cspot_config {
+    const char* ns;
+    const char* dir;
+    const char* namelog_dir;
+    const char* namelog_name;
+    const char* host_ip;
+};
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-#include "log.h"
 extern char WooF_namespace[2048];
 extern char WooF_dir[2048];
 extern char WooF_namelog_dir[2048];

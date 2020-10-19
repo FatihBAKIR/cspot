@@ -1,7 +1,5 @@
-extern "C" {
 #include "log.h"
 #include "woofc.h"
-}
 
 #include <debug.h>
 #include <errno.h>
@@ -22,6 +20,7 @@ extern "C" {
 #include <vector>
 #include <woofc-access.h>
 #include <atomic>
+#include <map>
 
 namespace {
 std::vector<std::string> worker_containers;
@@ -71,10 +70,8 @@ int WooFInit() {
     } else {
         strncpy(WooF_dir, str, sizeof(WooF_dir));
     }
-    if (strcmp(WooF_dir, "/") == 0) {
-        fprintf(stderr, "WooFInit: WOOFC_DIR can't be %s\n", WooF_dir);
-        exit(1);
-    }
+
+    DEBUG_FATAL_IF(strcmp(WooF_dir, "/") == 0, "WooFInit: WOOFC_DIR can't be %s\n", WooF_dir);
 
     if (WooF_dir[strlen(WooF_dir) - 1] == '/') {
         WooF_dir[strlen(WooF_dir) - 1] = 0;
@@ -116,8 +113,8 @@ int WooFInit() {
         exit(1);
     }
     Name_log = MIOAddr(lmio);
-
 #endif
+
     Name_id = name_id;
 
     return 1;
@@ -198,7 +195,7 @@ void WooFContainerLauncher(std::unique_ptr<CA> ca) {
     for (int count = 0; count < container_count; ++count) {
         worker_containers.emplace_back(
             fmt::format("CSPOTWorker-{}-{:x}-{}", pathp + 1, WooFNameHash(WooF_namespace), count));
-        DEBUG_LOG("\t - %s\n", worker_containers[count].c_str());
+        DEBUG_LOG("%s\n", worker_containers[count].c_str());
     }
 
     // kill any existing workers using CleanupDocker
@@ -212,56 +209,41 @@ void WooFContainerLauncher(std::unique_ptr<CA> ca) {
     for (int count = 0; count < container_count; count++) {
         DEBUG_LOG("WooFContainerLauncher: launch %d\n", count + 1);
 
-        auto launch_string = (char*)malloc(1024 * 8);
-        if (launch_string == NULL) {
-            exit(1);
-        }
-
-        memset(launch_string, 0, 1024 * 8);
-
         auto port = WooFPortHash(WooF_namespace);
 
-        // begin constructing the launch string
-        sprintf(launch_string + strlen(launch_string),
-                "docker run -t "
-                "--rm " // option tells the container that it shuold remove itself when
-                        // stopped
-                "--name %s "
-                "-e LD_LIBRARY_PATH=/usr/local/lib "
-                "-e WOOFC_NAMESPACE=%s "
-                "-e WOOFC_DIR=%s "
-                "-e WOOF_NAME_ID=%lu "
-                "-e WOOF_NAMELOG_NAME=%s "
-                "-e WOOF_HOST_IP=%s ",
-                worker_containers[count].c_str(),
-                WooF_namespace,
-                pathp,
-                Name_id,
-                Namelog_name,
-                Host_ip);
+        std::map<std::string, std::string> envs {
+            { "LD_LIBRARY_PATH", "/usr/local/lib" },
+            { "WOOFC_NAMESPACE", WooF_namespace },
+            { "WOOFC_DIR", WooF_dir },
+            { "WOOF_NAME_ID", std::to_string(Name_id) },
+            { "WOOF_NAMELOG_NAME", Namelog_name },
+            { "WOOF_HOST_IP", Host_ip },
+            { "WOOF_NAMELOG_DIR", WooF_namelog_dir },
+        };
+
+        auto launch_string = fmt::format("docker run -t --rm --name {} ", worker_containers[count]);
+
+        std::vector<std::string> environ_strings(envs.size());
+        std::transform(envs.begin(), envs.end(), environ_strings.begin(), [](auto& kv) {
+            return fmt::format("-e {}=\"{}\"", kv.first, kv.second);
+        });
+
+        launch_string += fmt::format("{} ", fmt::join(environ_strings, " "));
 
         if (count == 0) {
-            sprintf(launch_string + strlen(launch_string), "-p %d:%d ", port, port);
+            launch_string += fmt::format("-p {}:{} ", port, port);
         }
 
-        sprintf(launch_string + strlen(launch_string),
-                "-v %s:%s "
-                "-v %s:/cspot-namelog "
-                "cspot-docker-centos7 "
-                "%s/%s ",
-                WooF_dir,
-                pathp,
-                WooF_namelog_dir, /* all containers find namelog in /cspot-namelog */
-                pathp,
-                "woofc-container");
+        launch_string += fmt::format("-v {}:{} centos:7 {}/{} ", WooF_dir,
+                                     WooF_namelog_dir,
+                                     WooF_dir,
+                                     "woofc-container");
 
         if (count == 0) {
-            sprintf(launch_string + strlen(launch_string), "-M ");
+            launch_string += "-M ";
         }
 
-        DEBUG_LOG("\tcommand: '%s'\n", launch_string);
-
-        std::cerr << launch_string << '\n';
+        DEBUG_LOG("\tcommand: '%s'\n", launch_string.c_str());
 
         launch_threads.emplace_back([=] { WooFDockerThread(launch_string); });
     }

@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(__cplusplus)
-extern "C" {
+#include <string_view>
 #endif
 
 typedef enum EventState
@@ -38,6 +39,16 @@ struct event_stc {
     char woofc_namespace[1024];
     unsigned long ino; // for caching if enabled
     uint64_t timestamp;
+
+#if defined(__cplusplus)
+    std::string_view get_namespace() const {
+        return woofc_namespace;
+    }
+
+    void set_namespace(std::string_view ns) {
+        strncpy(woofc_namespace, ns.data(), std::min<int>(ns.size(), std::size(woofc_namespace)));
+    }
+#endif
 };
 
 typedef struct event_stc EVENT;
@@ -48,6 +59,9 @@ typedef struct event_stc EVENT;
 #define INVALID (128)
 #endif
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 EVENT* EventCreate(EventState type, unsigned long host);
 
 void EventFree(EVENT* ev);

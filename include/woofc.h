@@ -1,12 +1,13 @@
 #ifndef WOOFC
 #define WOOFC
 
+#include "log.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
 #include "dlist.h"
-#include "log.h"
 #include "lsema.h"
 #include "mio.h"
 
